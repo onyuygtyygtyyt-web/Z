@@ -1,0 +1,134 @@
+name: Omar Bot
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */5 * * *'
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      # ─── Checkout ───────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ─── Runtimes ───────────────────────────────────────────────────────────
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # ─── System dependencies ─────────────────────────────────────────────────
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            aria2 \
+            ffmpeg \
+            curl \
+            wget \
+            git \
+            build-essential \
+            libpq-dev \
+            libssl-dev \
+            libjpeg-dev \
+            libfreetype6-dev \
+            libffi-dev \
+            python3-dev
+
+      # ─── yt-dlp ──────────────────────────────────────────────────────────────
+      - name: Install yt-dlp
+        run: |
+          sudo curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" \
+            -o /usr/local/bin/yt-dlp
+          sudo chmod +x /usr/local/bin/yt-dlp
+          yt-dlp --version
+
+      # ─── apkeep ──────────────────────────────────────────────────────────────
+      - name: Install apkeep
+        run: |
+          # Try the local binary first (already in repo), else download latest
+          if [ -x "./apkeep" ]; then
+            sudo cp ./apkeep /usr/local/bin/apkeep
+            echo "Used bundled apkeep binary"
+          else
+            sudo curl -L \
+              "https://github.com/EFForg/apkeep/releases/latest/download/apkeep-x86_64-unknown-linux-gnu" \
+              -o /usr/local/bin/apkeep
+            sudo chmod +x /usr/local/bin/apkeep
+            echo "Downloaded apkeep from GitHub"
+          fi
+          apkeep --version || echo "apkeep installed (no --version flag)"
+
+      # ─── Node packages ────────────────────────────────────────────────────────
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      # ─── Python packages ──────────────────────────────────────────────────────
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip wheel setuptools
+          pip install -r requirements.txt
+
+      # ─── Required directories ─────────────────────────────────────────────────
+      - name: Create required directories
+        run: |
+          mkdir -p auth_info cookies downloads data conversations app_cache
+
+      # ─── Verify all tools are available ──────────────────────────────────────
+      - name: Verify tool installations
+        run: |
+          echo "=== Tool versions ==="
+          node --version
+          python3 --version
+          pip --version
+          aria2c --version | head -1
+          ffmpeg -version | head -1
+          yt-dlp --version
+          apkeep --version || echo "apkeep ready"
+          echo "=== All tools verified ==="
+
+      # ─── Start Flask server + WhatsApp bot ────────────────────────────────────
+      - name: Run API server and WhatsApp bot
+        env:
+          GEMINI_SERVER: "http://127.0.0.1:5000"
+          PHONE_NUMBER: ${{ secrets.PHONE_NUMBER }}
+        run: |
+          echo "=== Starting Gemini API server on port 5000 ==="
+          python3 -m gunicorn \
+            --bind 0.0.0.0:5000 \
+            --workers 1 \
+            --threads 4 \
+            --timeout 180 \
+            --access-logfile - \
+            --error-logfile - \
+            main:app &
+
+          API_PID=$!
+          echo "API PID: $API_PID"
+
+          # Wait for the server to be ready
+          echo "Waiting for API to start..."
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:5000/health > /dev/null 2>&1; then
+              echo "=== API is ready after ${i}s ==="
+              break
+            fi
+            sleep 1
+          done
+
+          echo "=== Starting WhatsApp bot ==="
+          node index.js
+          
