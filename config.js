@@ -6,7 +6,7 @@
 module.exports = {
     // WhatsApp number used to PAIR the bot (digits only, with country code,
     // no "+" or "00"). Example for Morocco: "212688898322"
-    PHONE_NUMBER: "212688898322",
+    PHONE_NUMBER: "212719797027",
 
     // Developer phone number — only this user can run /cookie commands.
     DEVELOPER_NUMBER: "212688898322",
