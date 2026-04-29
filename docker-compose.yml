@@ -1,0 +1,52 @@
+version: "3.9"
+
+# Omar AI Bot — docker-compose
+# يشغّل سيرفر Python/Flask + بوت WhatsApp Node.js في حاوية واحدة أو منفصلة.
+#
+# متطلبات:
+#   docker >= 24.x   docker-compose >= 2.x
+#
+# طريقة التشغيل:
+#   cp .env.example .env       # أضف GEMINI_COOKIES و GEMINI_API_KEY و غيرها
+#   docker-compose up --build
+
+services:
+
+  # ─── Python Flask server (Gemini bridge + Tool API) ──────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Node.js WhatsApp bot (Baileys) ──────────────────────────────────────
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - FLASK_URL=http://server:5000
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./session:/app/session    # persist WhatsApp session
+    stdin_open: true
+    tty: true                     # needed for QR / pairing code display

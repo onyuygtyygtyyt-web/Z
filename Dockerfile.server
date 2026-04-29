@@ -1,0 +1,34 @@
+FROM python:3.11-slim
+
+# System deps — aria2 for large-file downloads, ffmpeg for yt-dlp post-processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        aria2 \
+        ffmpeg \
+        curl \
+        wget \
+        git \
+        build-essential \
+        libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python deps (uv is faster but pip works everywhere)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# apkeep binary (prebuilt Linux x86_64 release)
+RUN curl -L \
+    "https://github.com/EFForg/apkeep/releases/latest/download/apkeep-x86_64-unknown-linux-gnu" \
+    -o /usr/local/bin/apkeep && chmod +x /usr/local/bin/apkeep
+
+COPY . .
+
+EXPOSE 5000
+
+CMD ["gunicorn", \
+     "--bind", "0.0.0.0:5000", \
+     "--workers", "1", \
+     "--threads", "4", \
+     "--timeout", "180", \
+     "main:app"]

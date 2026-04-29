@@ -1,0 +1,16 @@
+node_modules
+auth_info
+.cache
+__pycache__
+*.pyc
+.git
+.gitignore
+.local
+.replit
+replit.nix
+attached_assets
+gemini/cookies/
+gemini/cookies.txt
+data/
+.venv
+.pytest_cache

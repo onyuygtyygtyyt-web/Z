@@ -1,0 +1,55 @@
+modules = ["nodejs-20", "nix", "python-3.11"]
+[agent]
+expertMode = true
+stack = "FLASK_VANILLA_JS"
+
+[nix]
+channel = "stable-25_05"
+packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "openssl", "postgresql", "tcl", "tk", "xcodebuild", "zlib"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "WhatsApp Bot"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Gemini Server"
+
+[[workflows.workflow]]
+name = "WhatsApp Bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
+
+[[workflows.workflow]]
+name = "Gemini Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 180 --reuse-port --reload main:app"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80

@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "gb1aYmk7obKJjcbUqz2-k"
+uri = "file://attached_assets/test_makepdf.pdf"
+type = "pdf"
+title = "اختبار توليد PDF"
